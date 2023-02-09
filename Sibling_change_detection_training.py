@@ -11,6 +11,7 @@ import random
 import sys
 from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
+from pathlib import Path
 
 def importData():
     wdir = "/nfs/a1/homes/py15jmc/"
@@ -107,11 +108,10 @@ def main():
     N = 10000
     ratio_True = 0.5
     ratio_train = 0.75
-    try:
+
+    if Path("df_2015.csv").exists():
         df_2015 = pd.read_csv("df_2015.csv")
-
-    except FileNotFoundError:
-
+    else:
         try:
             d1_train, i1_train, j1_train = np.load("d1train.npy")
             d2_train, i2_train, j2_train = np.load("d2train.npy")
@@ -123,15 +123,15 @@ def main():
 
             d1_train, i1_train, j1_train = sampleUniform2D(abs(coherence_2015)[:82], n_siblings_extend[:82], mask=mask_train[:82], N=N*ratio_train*ratio_True, bins=15)
             d2_train, i2_train, j2_train = sampleUniform2D(abs(coherence_2015)[:82], n_siblings_extend[:82], mask=mask_train[:82], N=N*ratio_train*ratio_True, bins=15)
-            
+
             d1_test, i1_test, j1_test = sampleUniform2D(abs(coherence_2015)[:82], n_siblings_extend[:82], mask=mask_test[:82], N=N*(1-ratio_train)*ratio_True, bins=15)
             d2_test, i2_test, j2_test = sampleUniform2D(abs(coherence_2015)[:82], n_siblings_extend[:82], mask=mask_test[:82], N=N*(1-ratio_train)*ratio_True, bins=15)
-            
+
             np.save("d1train.npy", np.stack((d1_train, i1_train, j1_train)))
             np.save("d2train.npy", np.stack((d2_train, i2_train, j2_train)))
 
-            np.save("d1test.npy", np.stack((d1_test, i1_test, j1_test)))
-            np.save("d2test.npy", np.stack((d2_test, i2_test, j2_test)))
+        np.save("d1test.npy", np.stack((d1_test, i1_test, j1_test)))
+        np.save("d2test.npy", np.stack((d2_test, i2_test, j2_test)))
 
         d1 = np.concatenate((d1_train, d1_test))
         i1 = np.concatenate((i1_train, i1_test))
@@ -145,8 +145,20 @@ def main():
         coords2 = np.vstack((i2, j2)).T
         
         # Goes through all the coords and chooses which ones to go forwards
-
         sims = SF.generateSims(coords1, coords2, d1, d2, ifgs, SHP_i, SHP_j, n_changes=None)
+        # output: 
+        # coord1
+        # coord2
+        # n_siblings
+        # std_jackknifed_coherence
+        # bias_jackknife
+        # mean_amplitude
+        # std_amplitude
+        # amplitude_of_POI
+        # amp_difference_between_current_and_prev_for_POI
+        # max_difference_of_all_sibs_for current and previous image
+        # coherence
+
         df_sims = pd.DataFrame(sims, columns = np.array(["i", "j", "n_siblings", "jk_std", "jk_bias", "amp_mean", "amp_std", "amp_px", "poi_diff", "max_amp_diff", "actual_coherence", "apparent_coherence"]))
 
         df_sims["apparent_coherence"] = np.concatenate(abs(df_sims["apparent_coherence"]))
@@ -155,9 +167,9 @@ def main():
         # Now need to add the unchanged values on to it
         n_changed01 = np.sum(abs(df_sims.apparent_coherence - df_sims.actual_coherence) > 0.1)
         try:
-            d3 = np.load("d3testtrain.npy")
-            i3 = np.load("i3testtrain.npy")
-            j3 = np.load("j3testtrain.npy")
+            d3, i3, j3 = np.load("d3testtrain.npy")
+            # i3 = np.load("i3testtrain.npy")
+            # j3 = np.load("j3testtrain.npy")
             
             coords3 = np.vstack((i3, j3)).T
         except FileNotFoundError:
@@ -168,9 +180,9 @@ def main():
             i3 = np.concatenate((i3_train, i3_test))
             j3 = np.concatenate((j3_train, j3_test))
             
-            np.save("d3testtrain.npy", d3)
-            np.save("i3testtrain.npy", i3)
-            np.save("j3testtrain.npy", j3)
+            np.save("d3testtrain.npy", np.stack((d3, i3, j3)))
+            # np.save("i3testtrain.npy", i3)
+            # np.save("j3testtrain.npy", j3)
 
             coords3 = np.vstack((i3, j3)).T
         
