@@ -913,7 +913,7 @@ def manipulateSiblings(coord1, coord2, d1, d2, data, sib_i, sib_j, n_change, smo
     
     # Check if n_change is None, if so generate random number
     if n_change is None:
-        n_change = np.random.randint(low=1, high=np.min(np.array([ph_1.shape[1], ph_2.shape[1]])), size=1)[0]
+        n_change = np.random.randint(low=np.round(np.min(np.array([ph_1.shape[1], ph_2.shape[1]]))*0.25), high=np.min(np.array([ph_1.shape[1], ph_2.shape[1]])), size=1)[0]
     else:
         pass
     
