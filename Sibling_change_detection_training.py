@@ -12,6 +12,8 @@ import sys
 from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
 from pathlib import Path
+import joblib 
+from datetime import datetime
 
 def importData():
     wdir = "/nfs/a1/homes/py15jmc/"
@@ -226,6 +228,9 @@ def main():
     SF.test_training_pie(train_labels, test_labels)
     
     rf, predictions, (fpr, tpr), importance = SF.runRF(train_features, train_labels, test_features, test_labels)
+    
+    # datetime.strftime(datetime.now(), "%Y%m%d_%H%M%S")
+    joblib.dump(rf, f"RF_{datetime.strftime(datetime.now(), '%Y%m%d_%H%M%S')}.jbl")
 
     plt.show()
 
