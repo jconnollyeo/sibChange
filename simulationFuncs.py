@@ -914,6 +914,7 @@ def manipulateSiblings(coord1, coord2, d1, d2, data, sib_i, sib_j, n_change, smo
     # Check if n_change is None, if so generate random number
     if n_change is None:
         n_change = np.random.randint(low=np.round(np.min(np.array([ph_1.shape[1], ph_2.shape[1]]))*0.25), high=np.min(np.array([ph_1.shape[1], ph_2.shape[1]])), size=1)[0]
+        # n_change = np.random.randint(low=1, high=np.min(np.array([ph_1.shape[1], ph_2.shape[1]])), size=1)[0]
     else:
         pass
     
@@ -1147,18 +1148,70 @@ def falseNaN(arr, keep=True):
     return arrnan
 
 def jackknifeImage(ifg1, ifg2, sib_i, sib_j):
+    from multiprocessing import Pool
     import numpy as np
     from tqdm import tqdm
-    
-    out = np.empty(sib_i.shape, dtype=np.complex64)
-    for s in tqdm(np.arange(out.shape[0]), desc="Jackknife resampling"):
-        mask = np.ones(out.shape[0], dtype=bool)
+    from functools import partial
+
+    def jack(s):
+        mask = np.ones(sib_i.shape, dtype=bool)
         mask[s] = False
-        out[s] = quickCoherence(ifg1, ifg2, sib_i[mask].reshape((sib_i.shape[0]-1, *sib_i.shape[1:])), sib_j[mask].reshape((sib_j.shape[0]-1, *sib_j.shape[1:])), progress=False)
+        out = quickCoherence(ifg1, ifg2, sib_i[mask].reshape((sib_i.shape[0]-1, *sib_i.shape[1:])), sib_j[mask].reshape((sib_j.shape[0]-1, *sib_j.shape[1:])), progress=False)
+        
+        return s, out
+    
+    # out = np.empty(sib_i.shape, dtype=np.complex64)
+    # for s in tqdm(np.arange(out.shape[0]), desc="Jackknife resampling"):
+    
+    pool = Pool(6)
+    outputs = pool.map(jack, range(sib_i.shape[0]))
+    
+    print (outputs)
+
+        # mask = np.ones(out.shape[0], dtype=bool)
+        # mask[s] = False
+        # out[s] = quickCoherence(ifg1, ifg2, sib_i[mask].reshape((sib_i.shape[0]-1, *sib_i.shape[1:])), sib_j[mask].reshape((sib_j.shape[0]-1, *sib_j.shape[1:])), progress=False)
         
     out[~(~np.isnan(sib_i)*~np.isnan(sib_j))] = np.nan + 1j*np.nan
     
     return out
+
+def coherence_exclude(ifg1, ifg2, sib_i, sib_j, ix):
+    """
+    Function to calculate the coherence between two images using while 
+    excluding a slice of the sibling arrays (used for jacknknife resampling).
+    """
+    import numpy as np
+    mask = np.ones(sib_i.shape, dtype=bool)
+    mask[ix] = False
+    
+    coh = quickCoherence(ifg1, ifg2, sib_i[mask].reshape((sib_i.shape[0]-1, *sib_i.shape[1:])), sib_j[mask].reshape((sib_j.shape[0]-1, *sib_j.shape[1:])), progress=False)
+
+    return ix, coh
+
+def jackknifeMulticore(ifg1, ifg2, sib_i, sib_j, n_cores=6):
+    """ 
+    Function to do multicore jackknife resampling of coherence estimation. 
+    """
+    from functools import partial
+    from multiprocessing import Pool
+    import numpy as np
+
+    pool = Pool(n_cores)
+    
+    results = pool.map(partial(coherence_exclude, ifg1, ifg2, sib_i, sib_j), np.arange(sib_i.shape[0]))
+    
+    out = np.empty((sib_i.shape), dtype=np.complex64)
+
+    for result in results:
+        print (f"{result[1].shape = }")
+        print (f"{out.shape = }")
+        s, arr = result
+        out[s] = arr
+
+    out[np.logical_or(np.isnan(sib_i), np.isnan(sib_j))] = np.nan
+
+    return out    
 
 def generateMetricsIFG(ifg1, ifg2, sib_i, sib_j):
     import numpy as np
@@ -1170,18 +1223,30 @@ def generateMetricsIFG(ifg1, ifg2, sib_i, sib_j):
     n_siblings = np.sum(mask, axis=0)
     
     image_with_siblings = np.full((2, *sib_i.shape), fill_value=np.nan+1j*np.nan)
+
+    # print (ifg1[sib_i[mask].astype(int), sib_j[mask].astype(int)].shape)
+
     image_with_siblings[0, mask] = ifg1[sib_i[mask].astype(int), sib_j[mask].astype(int)]
     image_with_siblings[1, mask] = ifg2[sib_i[mask].astype(int), sib_j[mask].astype(int)]
     
     intAmp = abs(image_with_siblings[0])*abs(image_with_siblings[1])
     # max_amp_diff = np.nanmax(intAmp[1:] - intAmp[0], axis=0).flatten() # NEW
     # print (image_with_siblings.shape)
+    print ("max_amp_diff")
     max_amp_diff = np.nanmax(abs(image_with_siblings[0, 1:]) - abs(image_with_siblings[1, 1:]), axis=0).flatten()
+    print ("poi_diff")
     poi_diff = abs(image_with_siblings[0, 0]) - abs(image_with_siblings[1, 0])
+
+    print ("Starting jackknife")
+    # jackknifed = jackknifeImage(ifg1, ifg2, sib_i, sib_j)
+    jackknifed = jackknifeMulticore(ifg1, ifg2, sib_i, sib_j)    
+    print ("Completed jackknife")
     
-    jackknifed = jackknifeImage(ifg1, ifg2, sib_i, sib_j)
+    print ("mean_jackknifed")
     mean_jackknifed = np.nanmean(abs(jackknifed), axis=0)
+    print ("coh")
     coh = quickCoherence(ifg1, ifg2, sib_i, sib_j)
+    print ("bias")
     bias = (n_siblings-1)*(abs(mean_jackknifed) - abs(coh))
     
     i_, j_ = np.mgrid[0:ifg1.shape[0], 0:ifg2.shape[1]]
@@ -1274,3 +1339,18 @@ def sampleUniform2D(arr1, arr2, mask=None, bins=30, N=1000):
     d, i, j = np.unravel_index(out_flat[~np.isnan(out_flat)][:int(N)].astype(int), shape=arr1.shape)
     
     return d, i, j
+
+def postProcess_df(df_fn):
+    df = pd.read_csv(df_fn)
+
+    plt.figure(1)
+    plt.hist(df["n_siblings"], bins=np.linspace(-0.5, 100.5, 101))
+    plt.title("Number of siblings of each pixel used intest/training. ")
+
+    plt.figure(2)
+    plt.scatter(df["n_siblings"], abs(df["actual_coherence"] - df["apparent_coherence"]), s=1)
+    plt.xlabel("Number of siblings of each pixel")
+    plt.ylabel("Difference in coherence (from simulated change)")
+
+    fig, ax = plt.subplots(nrows=1, ncols=2)
+    ax[0].scatter()
