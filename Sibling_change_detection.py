@@ -39,17 +39,41 @@ coherence_2015 = np.load(wdir + "bootstrap/coherence_2015.npy")
 metrics = SF.generateMetricsIFG(ifg1, ifg2, SHP_i, SHP_j)
 
 df = pd.DataFrame(metrics, columns = np.array(["i", "j", "n_siblings", "jk_std", "jk_bias", "amp_mean", "amp_std", "amp_px", "poi_diff", "max_amp_diff", "actual_coherence", "apparent_coherence"]))
+# df = pd.read_csv("/nfs/a1/homes/py15jmc/bootstrap/2023/IFG_100_101_20230214_162302.csv")
+
+dropped_mask = np.ones(ifg1.shape, dtype=bool)
+
+# Remvoe any nan values
+for ix in list(set(np.where(np.isnan(df))[0])):
+    
+    dropped_mask[int(df["i"][ix]), int(df["j"][ix])] = False
+    df = df.drop(ix)
+
+# Remove any pixels that have fewer than 15 siblings. 
+for ix in list(set(np.where(df["n_siblings"] < 15)[0])):
+    
+    dropped_mask[int(df["i"][ix]), int(df["j"][ix])] = False
+    df = df.drop(ix)
 
 df.to_csv(f"IFG_{ix1}_{ix2}_{datetime.strftime(datetime.now(), '%Y%m%d_%H%M%S')}.csv")
-
-RF = joblib.load("25perc_bound/RF_20230209_161057.jbl")
+RF = joblib.load("RF_20230215_121116.jbl")
 
 predictions = RF.predict(df[["jk_std", "jk_bias", "amp_mean", "max_amp_diff", "poi_diff", "apparent_coherence"]])
 
-pred_arr = predictions.reshape(ifg.shape)
+predictions_arr = np.zeros(ifg1.shape, dtype=bool)
 
-plt.matshow(np.mean(abs(ifgs), axis=0), cmap="binary_r")
+predictions_arr[dropped_mask] = predictions
 
-plt.matshow(predictions, cmap="BuRd", alpha=0.4)
+np.save("predictions.npy", predictions_arr)
+# pred_arr = predictions.reshape(ifg1.shape)
+
+fig, ax = plt.subplots()
+ax.matshow(np.mean(abs(ifgs), axis=0), cmap="binary_r")
+ax.matshow(SF.falseNaN(predictions_arr), cmap="RdBu")
+
+fig, ax = plt.subplots()
+mask_siblings, predictions_filt = SF.filterPredictions(predictions_arr, SHP_i, SHP_j, 5)
+ax.matshow(np.mean(abs(ifgs), axis=0), cmap="binary_r")
+ax.matshow(SF.falseNaN(predictions_filt), cmap="RdBu")
 
 plt.show()
