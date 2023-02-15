@@ -1012,7 +1012,7 @@ def generateSims(coords1, coords2, d1s, d2s, data, sib_i, sib_j, n_changes):
             ph_change, actual_coherence, apparent_coherence = manipulateSiblings(coord1, coord2, d1, d2, data, sib_i, sib_j, n_change, smooth=True, seed=None)
         else:
             count = 0
-            while coh_diff < 0.1:
+            while coh_diff < 0.2:
                 ph_change, actual_coherence, apparent_coherence = manipulateSiblings(coord1, coord2, d1, d2, data, sib_i, sib_j, n_change, smooth=True, seed=None)
                 coh_diff = abs(actual_coherence - apparent_coherence)
                 if count == 20:
@@ -1027,11 +1027,12 @@ def generateSims(coords1, coords2, d1s, d2s, data, sib_i, sib_j, n_changes):
         
         assert d1 > 5, "d1 must be greater than 5"
         
-        amp_mean_temporal = np.mean(abs_data[d1 - 5:d1+1, coord1[0], coord1[1]])
-        amp_mean = np.mean(abs(np.product(ph_change, axis=0)))
+        # amp_mean_temporal = np.mean(abs_data[d1 - 5:d1+1, coord1[0], coord1[1]])
+        # amp_mean = np.mean(abs(np.product(ph_change, axis=0)))
+        amp_mean = np.mean(abs(ph_change[0]))
         amp_std  = np.std(abs(np.product(ph_change, axis=0)))
         amp_px   = abs(np.product(ph_change, axis=0))[0, 0]
-        int_amp = abs(ph_change)[0, :, 0]*abs(ph_change)[1, :, 0]
+        # int_amp = abs(ph_change)[0, :, 0]*abs(ph_change)[1, :, 0]
         # max_amp_diff = np.nanmax(abs(image_with_siblings[0, 1:]) - abs(image_with_siblings[1, 1:]), axis=0).flatten()
         
         max_amp_diff = np.nanmax(abs(ph_change)[1, 1:, 0] - abs(ph_change)[0, 1:, 0])
@@ -1196,7 +1197,8 @@ def jackknifeMulticore(ifg1, ifg2, sib_i, sib_j, n_cores=6):
     from functools import partial
     from multiprocessing import Pool
     import numpy as np
-
+    
+    print ("Starting jackknife multicore. ")
     pool = Pool(n_cores)
     
     results = pool.map(partial(coherence_exclude, ifg1, ifg2, sib_i, sib_j), np.arange(sib_i.shape[0]))
@@ -1204,8 +1206,6 @@ def jackknifeMulticore(ifg1, ifg2, sib_i, sib_j, n_cores=6):
     out = np.empty((sib_i.shape), dtype=np.complex64)
 
     for result in results:
-        print (f"{result[1].shape = }")
-        print (f"{out.shape = }")
         s, arr = result
         out[s] = arr
 
@@ -1229,7 +1229,9 @@ def generateMetricsIFG(ifg1, ifg2, sib_i, sib_j):
     image_with_siblings[0, mask] = ifg1[sib_i[mask].astype(int), sib_j[mask].astype(int)]
     image_with_siblings[1, mask] = ifg2[sib_i[mask].astype(int), sib_j[mask].astype(int)]
     
-    intAmp = abs(image_with_siblings[0])*abs(image_with_siblings[1])
+    # intAmp = abs(image_with_siblings[0])*abs(image_with_siblings[1])
+    intAmp = abs(image_with_siblings[0])
+
     # max_amp_diff = np.nanmax(intAmp[1:] - intAmp[0], axis=0).flatten() # NEW
     # print (image_with_siblings.shape)
     print ("max_amp_diff")
@@ -1241,7 +1243,7 @@ def generateMetricsIFG(ifg1, ifg2, sib_i, sib_j):
     # jackknifed = jackknifeImage(ifg1, ifg2, sib_i, sib_j)
     jackknifed = jackknifeMulticore(ifg1, ifg2, sib_i, sib_j)    
     print ("Completed jackknife")
-    
+
     print ("mean_jackknifed")
     mean_jackknifed = np.nanmean(abs(jackknifed), axis=0)
     print ("coh")
@@ -1254,7 +1256,7 @@ def generateMetricsIFG(ifg1, ifg2, sib_i, sib_j):
     # out = np.vstack((i_.flatten(), j_.flatten(), n_siblings.flatten(), np.nanstd(jackknifed, axis=0).flatten(), bias.flatten(), 
     #                  np.nanmean(intAmp, axis=0).flatten(), np.nanstd(intAmp, axis=0).flatten(), 
     #                  (abs(ifg1)*abs(ifg2)).flatten(), abs(coh).flatten(), abs(coh).flatten())).T
-    
+    print ("Making output metrics")
     out = np.vstack((i_.flatten(), 
                      j_.flatten(), 
                      n_siblings.flatten(), 
@@ -1345,7 +1347,7 @@ def postProcess_df(df_fn):
 
     plt.figure(1)
     plt.hist(df["n_siblings"], bins=np.linspace(-0.5, 100.5, 101))
-    plt.title("Number of siblings of each pixel used intest/training. ")
+    plt.title("Number of siblings of each pixel used in test/training. ")
 
     plt.figure(2)
     plt.scatter(df["n_siblings"], abs(df["actual_coherence"] - df["apparent_coherence"]), s=1)
@@ -1354,3 +1356,23 @@ def postProcess_df(df_fn):
 
     fig, ax = plt.subplots(nrows=1, ncols=2)
     ax[0].scatter()
+
+def filterPredictions(predictions, SHP_i, SHP_j, threshold):
+    import numpy as np
+
+    mask = ~np.isnan(SHP_i) & ~np.isnan(SHP_j)
+
+    mask_siblings = np.empty_like(SHP_i)
+
+    mask_siblings[mask] = predictions[(SHP_i[mask]).astype(int), (SHP_j[mask]).astype(int)]
+
+    if threshold % 1 == 0:
+        return mask_siblings, (np.nansum(mask_siblings, axis=0) > threshold) & predictions
+    else:
+        return mask_siblings, (np.nansum(mask_siblings, axis=0)/np.sum(mask, axis=0) > threshold) & predictions
+
+def main():
+    return None
+
+if __name__ == "__main__":
+    sys.exit(main())
