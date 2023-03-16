@@ -1,5 +1,5 @@
 import numpy as np
-from maxflow import Graph
+from maxflow.fastmin import aexpansion_grid
 
 # Load the image of probabilities
 img_prob = np.load('/nfs/a1/homes/py15jmc/bootstrap/2023/timeseries/predictions_100_101_20230221_202044.npy')
@@ -14,41 +14,41 @@ wdir = "/nfs/a1/homes/py15jmc/"
 neighbor_i_coords = np.load(wdir + "bootstrap/shp_i_20150511_20170617.npy")
 neighbor_j_coords = np.load(wdir + "bootstrap/shp_j_20150511_20170617.npy")
 
-# Define the graph
-height, width = img_prob.shape
-num_nodes = height * width
-graph = Graph[int](num_nodes, num_nodes * len(neighbor_i_coords[0]))
+def markov_random_field(image, num_neighbors):
+    h, w = image.shape
+    num_nodes = h * w
+    num_edges = 2 * num_nodes # each node can have up to 4 neighbors
+    
+    g = Graph[int](num_nodes, num_edges)
+    
+    for node_index in range(num_nodes):
+        g.add_node(node_index)
+    
+    for i in range(h):
+        for j in range(w):
+            node_index = i * w + j
+            
+            # add edges to neighbors
+            for di, dj in num_neighbors:
+                ni, nj = i + di, j + dj
+                if 0 <= ni < h and 0 <= nj < w:
+                    neighbor_index = ni * w + nj
+                    diff = abs(image[i, j] - image[ni, nj])
+                    capacity = 1.0 / (1.0 + diff)
+                    g.add_edge(node_index, neighbor_index, capacity, capacity)
+    
+    # compute maximum flow
+    flow = g.maxflow()
+    
+    # return segmented image
+    segmented_image = np.zeros_like(image)
+    for i in range(h):
+        for j in range(w):
+            node_index = i * w + j
+            if g.get_segment(node_index) == Graph.SINK:
+                segmented_image[i, j] = 1
+    
+    return segmented_image
 
-# Add the nodes and their unary potentials
-for y in range(height):
-    for x in range(width):
-        node_id = y * width + x
-        prob = img_prob[y, x]
-        graph.add_nodes(node_id, prob, 1.0 - prob)
-
-# Add the edges and their pairwise potentials
-for y in range(height):
-    for x in range(width):
-        node_id = y * width + x
-        for k in range(len(neighbor_i_coords[0])):
-            neighbor_y = y + neighbor_i_coords[node_id, k]
-            neighbor_x = x + neighbor_j_coords[node_id, k]
-            if neighbor_y >= 0 and neighbor_y < height and neighbor_x >= 0 and neighbor_x < width:
-                neighbor_id = neighbor_y * width + neighbor_x
-                diff = img_prob[y, x] - img_prob[neighbor_y, neighbor_x]
-                weight = gamma * np.exp(-lambda_ * diff**2)
-                graph.add_edge(node_id, neighbor_id, weight, weight)
-
-# Find the minimum energy labeling using alpha expansion
-graph.maxflow()
-labeling = graph.get_labeling()
-
-# Convert the labeling to a binary image of changed or unchanged pixels
-img_bin = labeling.reshape(height, width)
-
-
-plt.pcolormesh(img_bin)
-plt.colorbar()
-
-# Save the binary image to a file
-np.save('binary_image.npy', img_bin)
+seg = markov_random_field(img_prob, 2)
+# 1 = foreground -> changed
