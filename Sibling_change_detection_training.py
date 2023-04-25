@@ -1,6 +1,3 @@
-# Something going wrong with random_sample - still selects indices that are false in the mask. Unless something is wrong with the mask
-# too. Cannot find what is oing wrong.
-
 import simulationFuncs as SF
 import numpy as np
 import matplotlib.pyplot as plt
@@ -129,11 +126,19 @@ def main():
     mask_train[(f(x, y) > 0) & (z < 81) & (z > 6) & mask] = True
     mask_test[(f(x, y) < 0) & (z < 81) & (z > 6) & mask] = True
 
+    # plt.pcolormesh(np.sum(mask_train, axis=0))
+    # plt.colorbar()
+
+    # plt.figure()
+    # plt.pcolormesh(np.sum(mask_test, axis=0) + np.sum(mask_train, axis=0))
+    # plt.colorbar()
+    # plt.show()
+
     N = 20000
     ratio_True = 0.5
     ratio_train = 0.75
 
-    suffix, r = "_uniform", True
+    suffix, r = "_selection_metric", True
 
     if Path(f"df_2015{suffix}.csv").exists():
         df_2015 = pd.read_csv(f"df_2015{suffix}.csv")
@@ -143,15 +148,39 @@ def main():
             d2_train, i2_train, j2_train = np.load(f"d2train{suffix}.npy")
             d1_test, i1_test, j1_test = np.load(f"d1test{suffix}.npy")
             d2_test, i2_test, j2_test = np.load(f"d1test{suffix}.npy")
-            print("Files found")
+            print("Files found. Continuing. ")
         except FileNotFoundError:
-            print("File not found. ")
+            print("File not found. Creating the coords of the test/train set. ")
 
-            # d1_train, i1_train, j1_train = sampleUniform2D(abs(coherence_2015)[:82], n_siblings_extend[:82], mask=mask_train[:82], N=N*ratio_train*ratio_True, bins=15)
-            # d2_train, i2_train, j2_train = sampleUniform2D(abs(coherence_2015)[:82], n_siblings_extend[:82], mask=mask_train[:82], N=N*ratio_train*ratio_True, bins=15)
+            # d1_train, i1_train, j1_train = sampleUniform2D(
+            #     abs(coherence_2015)[:82],
+            #     n_siblings_extend[:82],
+            #     mask=mask_train[:82],
+            #     N=N * ratio_train * ratio_True,
+            #     bins=15,
+            # )
+            # d2_train, i2_train, j2_train = sampleUniform2D(
+            #     abs(coherence_2015)[:82],
+            #     n_siblings_extend[:82],
+            #     mask=mask_train[:82],
+            #     N=N * ratio_train * ratio_True,
+            #     bins=15,
+            # )
 
-            # d1_test, i1_test, j1_test = sampleUniform2D(abs(coherence_2015)[:82], n_siblings_extend[:82], mask=mask_test[:82], N=N*(1-ratio_train)*ratio_True, bins=15)
-            # d2_test, i2_test, j2_test = sampleUniform2D(abs(coherence_2015)[:82], n_siblings_extend[:82], mask=mask_test[:82], N=N*(1-ratio_train)*ratio_True, bins=15)
+            # d1_test, i1_test, j1_test = sampleUniform2D(
+            #     abs(coherence_2015)[:82],
+            #     n_siblings_extend[:82],
+            #     mask=mask_test[:82],
+            #     N=N * (1 - ratio_train) * ratio_True,
+            #     bins=15,
+            # )
+            # d2_test, i2_test, j2_test = sampleUniform2D(
+            #     abs(coherence_2015)[:82],
+            #     n_siblings_extend[:82],
+            #     mask=mask_test[:82],
+            #     N=N * (1 - ratio_train) * ratio_True,
+            #     bins=15,
+            # )
 
             d1_train, i1_train, j1_train = random_sample(
                 coherence_2015[:82],
@@ -180,8 +209,8 @@ def main():
             np.save(f"d1train{suffix}.npy", np.stack((d1_train, i1_train, j1_train)))
             np.save(f"d2train{suffix}.npy", np.stack((d2_train, i2_train, j2_train)))
 
-        np.save(f"d1test{suffix}.npy", np.stack((d1_test, i1_test, j1_test)))
-        np.save(f"d2test{suffix}.npy", np.stack((d2_test, i2_test, j2_test)))
+            np.save(f"d1test{suffix}.npy", np.stack((d1_test, i1_test, j1_test)))
+            np.save(f"d2test{suffix}.npy", np.stack((d2_test, i2_test, j2_test)))
 
         d1 = np.concatenate((d1_train, d1_test))
         i1 = np.concatenate((i1_train, i1_test))
@@ -211,25 +240,25 @@ def main():
         # max_difference_of_all_sibs_for current and previous image
         # coherence
 
-        df_sims = pd.DataFrame(
-            sims,
-            columns=np.array(
-                [
-                    "i",
-                    "j",
-                    "n_siblings",
-                    "jk_std",
-                    "jk_bias",
-                    "amp_mean",
-                    "amp_std",
-                    "amp_px",
-                    "poi_diff",
-                    "max_amp_diff",
-                    "actual_coherence",
-                    "apparent_coherence",
-                ]
-            ),
-        )
+        headers = [
+            "i",
+            "j",
+            "n_siblings",
+            "jk_std",
+            "jk_bias",
+            "amp_mean",
+            "amp_std",
+            "amp_px",
+            "poi_diff",
+            "max_amp_diff",
+            "selection_window_metric",
+            "actual_coherence",
+            "apparent_coherence",
+        ]
+
+        df_sims = pd.DataFrame(sims, columns=np.array(headers))
+
+        print(df_sims)  #########################################
 
         df_sims["apparent_coherence"] = np.concatenate(
             abs(df_sims["apparent_coherence"])
@@ -244,6 +273,7 @@ def main():
         n_changed01 = np.sum(
             abs(df_sims.apparent_coherence - df_sims.actual_coherence) > 0.1
         )
+
         try:
             d3, i3, j3 = np.load(f"d3testtrain{suffix}.npy")
             # i3 = np.load("i3testtrain.npy")
@@ -251,20 +281,30 @@ def main():
 
             coords3 = np.vstack((i3, j3)).T
         except FileNotFoundError:
-            # d3_train, i3_train, j3_train = sampleUniform2D(abs(coherence_2015)[:82], n_siblings_extend[:82], mask=mask_train[:82], N=n_changed01*ratio_train*(1-ratio_True)*2, bins=15)
-            # d3_test, i3_test, j3_test = sampleUniform2D(abs(coherence_2015)[:82], n_siblings_extend[:82], mask=mask_test[:82], N=n_changed01*(1-ratio_train)*(1-ratio_True)*2, bins=15)
+            # d3_train, i3_train, j3_train = sampleUniform2D(
+            #     abs(coherence_2015)[:82],
+            #     n_siblings_extend[:82],
+            #     mask=mask_train[:82],
+            #     N=n_changed01 * ratio_train * (1 - ratio_True) * 2,
+            #     bins=15,
+            # )
+            # d3_test, i3_test, j3_test = sampleUniform2D(
+            #     abs(coherence_2015)[:82],
+            #     n_siblings_extend[:82],
+            #     mask=mask_test[:82],
+            #     N=n_changed01 * (1 - ratio_train) * (1 - ratio_True) * 2,
+            #     bins=15,
+            # )
 
             d3_train, i3_train, j3_train = random_sample(
                 coherence_2015[:82],
                 mask=mask_train[:82],
                 size=n_changed01 * ratio_train * (1 - ratio_True) * 2,
-                bins=15,
             )
             d3_test, i3_test, j3_test = random_sample(
                 coherence_2015[:82],
                 mask=mask_test[:82],
                 size=n_changed01 * (1 - ratio_train) * (1 - ratio_True) * 2,
-                bins=15,
             )
 
             d3 = np.concatenate((d3_train, d3_test))
@@ -281,25 +321,7 @@ def main():
             coords3, coords3, d3, d3, ifgs, SHP_i, SHP_j, n_changes=None
         )
 
-        df_sims_unchanged = pd.DataFrame(
-            sims_unchanged,
-            columns=np.array(
-                [
-                    "i",
-                    "j",
-                    "n_siblings",
-                    "jk_std",
-                    "jk_bias",
-                    "amp_mean",
-                    "amp_std",
-                    "amp_px",
-                    "poi_diff",
-                    "max_amp_diff",
-                    "actual_coherence",
-                    "apparent_coherence",
-                ]
-            ),
-        )
+        df_sims_unchanged = pd.DataFrame(sims_unchanged, columns=np.array(headers))
 
         df_sims_unchanged["apparent_coherence"] = np.concatenate(
             abs(df_sims_unchanged["apparent_coherence"])
@@ -322,13 +344,20 @@ def main():
 
     plt.figure()
 
+    i_plot, j_plot = np.mgrid[0 : np.max(df_2015["i"]), 0 : np.max(df_2015["j"])]
+
+    split_mask_ = f(j_plot, i_plot) > 0
+
+    plt.pcolormesh(split_mask_, cmap="binary", alpha=0.4)
     plt.scatter(df_2015["j"], df_2015["i"], c=df_2015["labels"], s=2, cmap="bwr")
 
     # Doing the random forest
     labels = np.array(df_2015["labels"])
     print(labels)
 
-    # features = df_2015[["n_siblings", "jk_std", "jk_bias", "amp_mean", "amp_px", "max_amp_diff", "apparent_coherence"]]
+    print(list(df_2015))
+
+    # features = df_2015[["n_siblings", "jk_std", "jk_bias", "amp_mean", "amp_px", "max_amp_diff", "apparent_coherence"]
     features = df_2015[
         [
             "n_siblings",
@@ -337,6 +366,7 @@ def main():
             "amp_mean",
             "max_amp_diff",
             "poi_diff",
+            "selection_window_metric",
             "apparent_coherence",
         ]
     ]
