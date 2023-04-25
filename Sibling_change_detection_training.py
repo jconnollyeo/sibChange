@@ -138,10 +138,10 @@ def main():
     ratio_True = 0.5
     ratio_train = 0.75
 
-    suffix, r = "_selection_metric", True
+    suffix, r = "_ratio", True
 
-    if Path(f"df_2015{suffix}.csv").exists():
-        df_2015 = pd.read_csv(f"df_2015{suffix}.csv")
+    if Path(f"df{suffix}.csv").exists():
+        df = pd.read_csv(f"df{suffix}.csv")
     else:
         try:
             d1_train, i1_train, j1_train = np.load(f"d1train{suffix}.npy")
@@ -152,57 +152,57 @@ def main():
         except FileNotFoundError:
             print("File not found. Creating the coords of the test/train set. ")
 
-            # d1_train, i1_train, j1_train = sampleUniform2D(
-            #     abs(coherence_2015)[:82],
-            #     n_siblings_extend[:82],
-            #     mask=mask_train[:82],
-            #     N=N * ratio_train * ratio_True,
-            #     bins=15,
-            # )
-            # d2_train, i2_train, j2_train = sampleUniform2D(
-            #     abs(coherence_2015)[:82],
-            #     n_siblings_extend[:82],
-            #     mask=mask_train[:82],
-            #     N=N * ratio_train * ratio_True,
-            #     bins=15,
-            # )
-
-            # d1_test, i1_test, j1_test = sampleUniform2D(
-            #     abs(coherence_2015)[:82],
-            #     n_siblings_extend[:82],
-            #     mask=mask_test[:82],
-            #     N=N * (1 - ratio_train) * ratio_True,
-            #     bins=15,
-            # )
-            # d2_test, i2_test, j2_test = sampleUniform2D(
-            #     abs(coherence_2015)[:82],
-            #     n_siblings_extend[:82],
-            #     mask=mask_test[:82],
-            #     N=N * (1 - ratio_train) * ratio_True,
-            #     bins=15,
-            # )
-
-            d1_train, i1_train, j1_train = random_sample(
-                coherence_2015[:82],
+            d1_train, i1_train, j1_train = sampleUniform2D(
+                abs(coherence_2015)[:82],
+                n_siblings_extend[:82],
                 mask=mask_train[:82],
-                size=N * ratio_train * ratio_True,
+                N=N * ratio_train * ratio_True,
+                bins=15,
             )
-            d2_train, i2_train, j2_train = random_sample(
-                coherence_2015[:82],
+            d2_train, i2_train, j2_train = sampleUniform2D(
+                abs(coherence_2015)[:82],
+                n_siblings_extend[:82],
                 mask=mask_train[:82],
-                size=N * ratio_train * ratio_True,
+                N=N * ratio_train * ratio_True,
+                bins=15,
             )
 
-            d1_test, i1_test, j1_test = random_sample(
-                coherence_2015[:82],
+            d1_test, i1_test, j1_test = sampleUniform2D(
+                abs(coherence_2015)[:82],
+                n_siblings_extend[:82],
                 mask=mask_test[:82],
-                size=N * (1 - ratio_train) * ratio_True,
+                N=N * (1 - ratio_train) * ratio_True,
+                bins=15,
             )
-            d2_test, i2_test, j2_test = random_sample(
-                coherence_2015[:82],
+            d2_test, i2_test, j2_test = sampleUniform2D(
+                abs(coherence_2015)[:82],
+                n_siblings_extend[:82],
                 mask=mask_test[:82],
-                size=N * (1 - ratio_train) * ratio_True,
+                N=N * (1 - ratio_train) * ratio_True,
+                bins=15,
             )
+
+            # d1_train, i1_train, j1_train = random_sample(
+            #     coherence_2015[:82],
+            #     mask=mask_train[:82],
+            #     size=N * ratio_train * ratio_True,
+            # )
+            # d2_train, i2_train, j2_train = random_sample(
+            #     coherence_2015[:82],
+            #     mask=mask_train[:82],
+            #     size=N * ratio_train * ratio_True,
+            # )
+
+            # d1_test, i1_test, j1_test = random_sample(
+            #     coherence_2015[:82],
+            #     mask=mask_test[:82],
+            #     size=N * (1 - ratio_train) * ratio_True,
+            # )
+            # d2_test, i2_test, j2_test = random_sample(
+            #     coherence_2015[:82],
+            #     mask=mask_test[:82],
+            #     size=N * (1 - ratio_train) * ratio_True,
+            # )
 
             # ===========================
 
@@ -265,9 +265,9 @@ def main():
         )
         df_sims["actual_coherence"] = np.concatenate(abs(df_sims["actual_coherence"]))
 
-        df_2015 = df_sims.copy()
-        labels = abs(df_2015.apparent_coherence - df_2015.actual_coherence) > 0.1
-        df_2015["labels"] = labels
+        df = df_sims.copy()
+        labels = abs(df.apparent_coherence - df.actual_coherence) > 0.1
+        df["labels"] = labels
 
         # Now need to add the unchanged values on to it
         n_changed01 = np.sum(
@@ -334,31 +334,36 @@ def main():
             abs(df_sims.apparent_coherence - df_sims.actual_coherence) > 0.1
         ]
 
-        df_2015 = pd.concat((df_sims, df_sims_unchanged), ignore_index=True)
+        df = pd.concat((df_sims, df_sims_unchanged), ignore_index=True)
 
-        labels = np.ones(df_2015.shape[0], dtype=bool)
+        df = get_selection_metrics_ratio(
+            "/nfs/a1/homes/py15jmc/bootstrap/2023/Sibling_sel_window_metrics/IFG_all.csv",
+            df,
+        )
+
+        labels = np.ones(df.shape[0], dtype=bool)
         labels[-sims_unchanged.shape[0] :] = False
-        df_2015["labels"] = labels
+        df["labels"] = labels
 
-        df_2015.to_csv(f"df_2015{suffix}.csv", index=False, header=True)
+        df.to_csv(f"df{suffix}.csv", index=False, header=True)
 
     plt.figure()
 
-    i_plot, j_plot = np.mgrid[0 : np.max(df_2015["i"]), 0 : np.max(df_2015["j"])]
+    i_plot, j_plot = np.mgrid[0 : np.max(df["i"]), 0 : np.max(df["j"])]
 
     split_mask_ = f(j_plot, i_plot) > 0
 
     plt.pcolormesh(split_mask_, cmap="binary", alpha=0.4)
-    plt.scatter(df_2015["j"], df_2015["i"], c=df_2015["labels"], s=2, cmap="bwr")
+    plt.scatter(df["j"], df["i"], c=df["labels"], s=2, cmap="bwr")
 
     # Doing the random forest
-    labels = np.array(df_2015["labels"])
+    labels = np.array(df["labels"])
     print(labels)
 
-    print(list(df_2015))
+    print(list(df))
 
-    # features = df_2015[["n_siblings", "jk_std", "jk_bias", "amp_mean", "amp_px", "max_amp_diff", "apparent_coherence"]
-    features = df_2015[
+    # features = df[["n_siblings", "jk_std", "jk_bias", "amp_mean", "amp_px", "max_amp_diff", "apparent_coherence"]
+    features = df[
         [
             "n_siblings",
             "jk_std",
@@ -366,14 +371,13 @@ def main():
             "amp_mean",
             "max_amp_diff",
             "poi_diff",
-            "selection_window_metric",
             "apparent_coherence",
         ]
     ]
 
     feature_list = np.array(list(features.columns))
 
-    split_mask = f(df_2015.j, df_2015.i) <= 0
+    split_mask = f(df.j, df.i) <= 0
 
     train_features = features[~split_mask]
     test_features = features[split_mask]
@@ -392,6 +396,27 @@ def main():
     joblib.dump(rf, f"RF{suffix}.jbl")
 
     plt.show()
+
+
+def get_selection_metrics_ratio(filename, df_sims):
+    metrics_df = pd.read_csv(filename)
+
+    i = df_sims["i"]
+    j = df_sims["j"]
+
+    indices = []
+
+    for i_, j_ in zip(i, j):
+        ix = np.where((metrics_df["i"] == i_) & (metrics_df["j"] == j_))[0][0]
+        indices.append(ix)
+
+    metrics_df_sims = metrics_df.lox[df.index[indices]]
+
+    # ratio
+
+    out = df_sims / metrics_df_sims
+
+    return out
 
 
 if __name__ == "__main__":
