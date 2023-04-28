@@ -1221,9 +1221,9 @@ def generateSims(coords1, coords2, d1s, d2s, data, sib_i, sib_j, n_changes):
     else:
         pass
 
-    swm_mean = np.load("weighted_coh_diffs_mean.npy")
+    # swm_mean = np.load("weighted_coh_diffs_mean.npy")
 
-    out = np.empty((coords1.shape[0], 13), dtype=object)
+    out = np.empty((coords1.shape[0], 12), dtype=object)
     for n, (coord1, coord2, d1, d2, n_change) in enumerate(
         tqdm(zip(coords1, coords2, d1s, d2s, n_changes), total=coords1.shape[0])
     ):
@@ -1266,8 +1266,10 @@ def generateSims(coords1, coords2, d1s, d2s, data, sib_i, sib_j, n_changes):
         sib_j_ = np.zeros(ph_change.shape[1])[:, None, None]
 
         # if (coord1 == coord2).all():
-        swm = selection_window_metric(ph_change, sib_i_, sib_j_, 0, 1, progress=False)
-        swm = np.mean(swm) - swm_mean[coord1[0], coord1[1]]
+        # swm = selection_window_metric(ph_change, sib_i_, sib_j_, 0, 1, progress=False)
+        # swm = np.mean(swm) - swm_mean[coord1[0], coord1[1]]
+
+        # swm = 0
         # else:
         #     swm = selection_window_metric(
         #         ph_change, sib_i_, sib_j_, 0, 1, progress=False
@@ -1301,7 +1303,6 @@ def generateSims(coords1, coords2, d1s, d2s, data, sib_i, sib_j, n_changes):
                 amp_px,
                 poi_diff,
                 max_amp_diff,
-                swm,
                 actual_coherence,
                 apparent_coherence,
             ],
@@ -1561,13 +1562,13 @@ def generateMetricsIFG(ifg1, ifg2, sib_i, sib_j):
     #                  np.nanmean(intAmp, axis=0).flatten(), np.nanstd(intAmp, axis=0).flatten(),
     #                  (abs(ifg1)*abs(ifg2)).flatten(), abs(coh).flatten(), abs(coh).flatten())).T
 
-    swm_mean = np.load("weighted_coh_diffs_mean.npy")
+    # swm_mean = np.load("weighted_coh_diffs_mean.npy")
 
-    swm = selection_window_metric(
-        np.stack((ifg1, ifg2)), sib_i, sib_j, 0, 1, progress=True
-    )
+    # swm = selection_window_metric(
+    #     np.stack((ifg1, ifg2)), sib_i, sib_j, 0, 1, progress=True
+    # )
 
-    swm = np.mean(swm, axis=0) - swm_mean
+    # swm = np.mean(swm, axis=0) - swm_mean
 
     print("Making output metrics")
     out = np.vstack(
@@ -1582,7 +1583,6 @@ def generateMetricsIFG(ifg1, ifg2, sib_i, sib_j):
             max_amp_diff,
             intAmp[0].flatten(),
             poi_diff.flatten(),
-            swm.flatten(),
             abs(coh).flatten(),
             abs(coh).flatten(),
         )

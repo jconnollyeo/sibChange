@@ -251,7 +251,6 @@ def main():
             "amp_px",
             "poi_diff",
             "max_amp_diff",
-            "selection_window_metric",
             "actual_coherence",
             "apparent_coherence",
         ]
@@ -281,31 +280,31 @@ def main():
 
             coords3 = np.vstack((i3, j3)).T
         except FileNotFoundError:
-            # d3_train, i3_train, j3_train = sampleUniform2D(
-            #     abs(coherence_2015)[:82],
-            #     n_siblings_extend[:82],
-            #     mask=mask_train[:82],
-            #     N=n_changed01 * ratio_train * (1 - ratio_True) * 2,
-            #     bins=15,
-            # )
-            # d3_test, i3_test, j3_test = sampleUniform2D(
-            #     abs(coherence_2015)[:82],
-            #     n_siblings_extend[:82],
-            #     mask=mask_test[:82],
-            #     N=n_changed01 * (1 - ratio_train) * (1 - ratio_True) * 2,
-            #     bins=15,
-            # )
-
-            d3_train, i3_train, j3_train = random_sample(
-                coherence_2015[:82],
+            d3_train, i3_train, j3_train = sampleUniform2D(
+                abs(coherence_2015)[:82],
+                n_siblings_extend[:82],
                 mask=mask_train[:82],
-                size=n_changed01 * ratio_train * (1 - ratio_True) * 2,
+                N=n_changed01 * ratio_train * (1 - ratio_True) * 2,
+                bins=15,
             )
-            d3_test, i3_test, j3_test = random_sample(
-                coherence_2015[:82],
+            d3_test, i3_test, j3_test = sampleUniform2D(
+                abs(coherence_2015)[:82],
+                n_siblings_extend[:82],
                 mask=mask_test[:82],
-                size=n_changed01 * (1 - ratio_train) * (1 - ratio_True) * 2,
+                N=n_changed01 * (1 - ratio_train) * (1 - ratio_True) * 2,
+                bins=15,
             )
+
+            # d3_train, i3_train, j3_train = random_sample(
+            #     coherence_2015[:82],
+            #     mask=mask_train[:82],
+            #     size=n_changed01 * ratio_train * (1 - ratio_True) * 2,
+            # )
+            # d3_test, i3_test, j3_test = random_sample(
+            #     coherence_2015[:82],
+            #     mask=mask_test[:82],
+            #     size=n_changed01 * (1 - ratio_train) * (1 - ratio_True) * 2,
+            # )
 
             d3 = np.concatenate((d3_train, d3_test))
             i3 = np.concatenate((i3_train, i3_test))
@@ -345,6 +344,9 @@ def main():
         labels[-sims_unchanged.shape[0] :] = False
         df["labels"] = labels
 
+        print("Headers")
+        print(list(df))
+
         df.to_csv(f"df{suffix}.csv", index=False, header=True)
 
     plt.figure()
@@ -375,6 +377,8 @@ def main():
         ]
     ]
 
+    # print(np.where(np.isnan(df)))
+    print(df)
     feature_list = np.array(list(features.columns))
 
     split_mask = f(df.j, df.i) <= 0
@@ -399,22 +403,42 @@ def main():
 
 
 def get_selection_metrics_ratio(filename, df_sims):
-    metrics_df = pd.read_csv(filename)
+    df_metrics = pd.read_csv(filename)
 
-    i = df_sims["i"]
-    j = df_sims["j"]
+    # Get the indices of the coords used in training.
+    i = df_sims["i"].astype(int)
+    j = df_sims["j"].astype(int)
 
     indices = []
 
+    # Loop through the training indeces and find the corresponding mean metrics
+    # for the estimation period.
     for i_, j_ in zip(i, j):
-        ix = np.where((metrics_df["i"] == i_) & (metrics_df["j"] == j_))[0][0]
+        ix = np.where((df_metrics["i"] == i_) & (df_metrics["j"] == j_))[0][0]
         indices.append(ix)
 
-    metrics_df_sims = metrics_df.lox[df.index[indices]]
+    # Based on the dataframe position indices in the estimation period metrics,
+    # retrieve those values and put into the metrics df sims dataframe.
+    # df_metrics_sims = df_metrics.loc[df_sims.index[indices]]
+    df_metrics_sims = df_metrics.loc[indices]
 
-    # ratio
+    # Get the ratio between the df_sims (values for this particular image) and
+    # the metrics in the estimation period.
 
-    out = df_sims / metrics_df_sims
+    # df_metrics_sims[df_metrics_sims == 0] = np.nan
+
+    # df_sims[df_sims == 0] = np.nan
+
+    out = df_sims.copy()
+
+    out.reset_index(drop=True, inplace=True)
+    df_metrics_sims.reset_index(drop=True, inplace=True)
+
+    # print(f"{out = }")
+    # print(f"{df_metrics_sims = }")
+
+    out[list(out)[3:]] = out[list(out)[3:]] / df_metrics_sims[list(df_metrics_sims)[3:]]
+    # out = df_sims / df_metrics_sims
 
     return out
 
