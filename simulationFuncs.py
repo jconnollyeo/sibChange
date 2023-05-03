@@ -1521,7 +1521,7 @@ def generateMetricsIFG(ifg1, ifg2, sib_i, sib_j):
 
     n_siblings = np.sum(mask, axis=0)
 
-    image_with_siblings = np.full((2, *sib_i.shape), fill_value=np.nan + 1j * np.nan)
+    image_with_siblings = np.empty((2, *sib_i.shape), dtype=np.complex64) * np.nan
 
     # print (ifg1[sib_i[mask].astype(int), sib_j[mask].astype(int)].shape)
 
@@ -1532,8 +1532,8 @@ def generateMetricsIFG(ifg1, ifg2, sib_i, sib_j):
         sib_i[mask].astype(int), sib_j[mask].astype(int)
     ]
 
-    # intAmp = abs(image_with_siblings[0])*abs(image_with_siblings[1])
-    intAmp = abs(image_with_siblings[0]) / abs(image_with_siblings[1])
+    intAmp = abs(image_with_siblings[0]) * abs(image_with_siblings[1])
+    # intAmp = abs(image_with_siblings[0]) / abs(image_with_siblings[1])
 
     # max_amp_diff = np.nanmax(intAmp[1:] - intAmp[0], axis=0).flatten() # NEW
     # print (image_with_siblings.shape)

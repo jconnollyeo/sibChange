@@ -33,7 +33,27 @@ coherence_2015 = np.load(wdir + "bootstrap/coherence_2015.npy")
 
 # ix1, ix2 = 100, 101
 
-for ix1, ix2 in zip(np.arange(95, 110), np.arange(96, 111)):
+
+def get_selection_metrics_ratio(filename, df_sims):
+    df_metrics = pd.read_csv(filename)
+    # Based on the dataframe position indices in the estimation period metrics,
+    # retrieve those values and put into the metrics df sims dataframe.
+    # df_metrics_sims = df_metrics.loc[df_sims.index[indices]]
+    # Get the ratio between the df_sims (values for this particular image) and
+    # the metrics in the estimation period.
+    out = df_sims.copy()
+    out.reset_index(drop=True, inplace=True)
+    df_metrics.reset_index(drop=True, inplace=True)
+    out[list(out)[3:]] = out[list(out)[3:]] / df_metrics[list(df_metrics)[3:]]
+    return out
+
+
+# ixs_ = np.load("ixs.npy")
+# ixs = np.asarray([i for i in np.arange(81) if i not in ixs_])
+
+# for ix1, ix2 in zip(ixs, ixs + 1):
+for ix1, ix2 in zip(np.arange(90, 110), np.arange(91, 111)):
+
     if False:
         pass
     else:
@@ -42,6 +62,8 @@ for ix1, ix2 in zip(np.arange(95, 110), np.arange(96, 111)):
         ifg2 = ifgs[ix2]
 
         metrics = SF.generateMetricsIFG(ifg1, ifg2, SHP_i, SHP_j)
+
+        # Dealing with inf or nan values in metrics
 
         df = pd.DataFrame(
             metrics,
@@ -57,18 +79,34 @@ for ix1, ix2 in zip(np.arange(95, 110), np.arange(96, 111)):
                     "amp_px",
                     "poi_diff",
                     "max_amp_diff",
-                    "selection_window_metric",
                     "actual_coherence",
                     "apparent_coherence",
                 ]
             ),
         )
-        # df = pd.read_csv("/nfs/a1/homes/py15jmc/bootstrap/2023/IFG_100_101_20230214_162302.csv")
+        df.to_csv(
+            f"/nfs/a1/homes/py15jmc/bootstrap/2023/Sibling_sel_window_metrics/IFG_{str(ix1).zfill(3)}_{str(ix2).zfill(3)}.csv"
+        )
+
+        continue
+
+        df = get_selection_metrics_ratio(
+            "/nfs/a1/homes/py15jmc/bootstrap/2023/Sibling_sel_window_metrics/IFG_all.csv",
+            df,
+        )  # Turn it into ratios
 
         dropped_mask = np.ones(ifg1.shape, dtype=bool)
 
         # Remove any nan values
-        ix_nan = list(set(np.where(np.isnan(df))[0]))
+        ix_nan = list(
+            set(
+                list(set(np.where(np.isnan(df))[0]))
+                + list(set(np.where(np.isinf(df))[0]))
+            )
+        )
+
+        print(f"{len(ix_nan) = }")
+
         for ix in ix_nan:
             # print (f"Dropping bc nan: {ix}")
             try:
@@ -89,18 +127,17 @@ for ix1, ix2 in zip(np.arange(95, 110), np.arange(96, 111)):
             print(f"Dropping {ix}")
             df = df.drop(ix)
 
-        suffix = "_SWM"
+        suffix = "_ratio"
 
         np.save(
-            f"timeseries/dropped_mask_{ix1}_{ix2}_{datetime.strftime(datetime.now(), '%Y%m%d_%H%M%S')}{suffix}.npy",
+            f"actual/dropped_mask_{ix1}_{ix2}_{suffix}.npy",
             dropped_mask,
         )
 
-        df.to_csv(
-            f"timeseries/IFG_{ix1}_{ix2}_{datetime.strftime(datetime.now(), '%Y%m%d_%H%M%S')}{suffix}.csv"
-        )
+        df.to_csv(f"actual/IFG_{ix1}_{ix2}_dropped{suffix}.csv")
         # RF = joblib.load("RF_20230215_121116.jbl")
-        RF = joblib.load("RF_selection_metric.jbl")
+
+        RF = joblib.load("RF_ratio.jbl")
 
         features = df[
             [
@@ -110,7 +147,6 @@ for ix1, ix2 in zip(np.arange(95, 110), np.arange(96, 111)):
                 "amp_mean",
                 "max_amp_diff",
                 "poi_diff",
-                "selection_window_metric",
                 "apparent_coherence",
             ]
         ]
@@ -126,11 +162,11 @@ for ix1, ix2 in zip(np.arange(95, 110), np.arange(96, 111)):
 
         probs_arr[dropped_mask] = probs
         np.save(
-            f"timeseries/probabilities_{ix1}_{ix2}_{datetime.strftime(datetime.now(), '%Y%m%d_%H%M%S')}{suffix}.npy",
+            f"actual/probabilities_{ix1}_{ix2}_{datetime.strftime(datetime.now(), '%Y%m%d_%H%M%S')}{suffix}.npy",
             probs_arr,
         )
         np.save(
-            f"timeseries/predictions_{ix1}_{ix2}_{datetime.strftime(datetime.now(), '%Y%m%d_%H%M%S')}{suffix}.npy",
+            f"actual/predictions_{ix1}_{ix2}_{datetime.strftime(datetime.now(), '%Y%m%d_%H%M%S')}{suffix}.npy",
             predictions_arr,
         )
 
