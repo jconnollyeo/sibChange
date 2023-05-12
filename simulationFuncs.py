@@ -1023,7 +1023,9 @@ def runRF(
 
     confusion_matrix_display(test_labels, predictions, vmin=vmin, vmax=vmax, ax=ax[0])
 
-    a = RocCurveDisplay.from_estimator(rf, test_features, test_labels, ax=ax[1])
+    # a = RocCurveDisplay.from_estimator(rf, test_features, test_labels, ax=ax[1])
+    prob_true = rf.predict_proba(test_features)[:, 1]
+    a, fpr, tpr = RocCurve_threshold(test_labels, prob_true, ax=ax[1])
 
     ax[1].plot([0, 1], [0, 1], "r-")
     ax[1].set_aspect(1)
@@ -1040,7 +1042,54 @@ def runRF(
 
         joblib.dump(rf, f"{save_fn}.joblib")
 
-    return rf, predictions, (a.fpr, a.tpr), importance
+    # return rf, predictions, (a.fpr, a.tpr), importance
+    return rf, predictions, (fpr, tpr), importance
+
+
+def RocCurve_threshold(test_labels, prob_true, ax=None):
+
+    if isinstance(ax, type(None)):
+        fig, ax = plt.subplots()
+    else:
+        pass
+
+    fpr = []
+    tpr = []
+
+    thresholds = np.arange(0, 1.01, 0.01)
+
+    for threshold in thresholds:
+        pred_labels = prob_true > threshold
+
+        TN = np.sum((test_labels == False) & (pred_labels == False))
+        FP = np.sum((test_labels == False) & (pred_labels == True))
+        FN = np.sum((test_labels == True) & (pred_labels == False))
+        TP = np.sum((test_labels == True) & (pred_labels == True))
+
+        fpr_ = FP / (FP + TN)
+        tpr_ = TP / (TP + FN)
+
+        fpr.append(fpr_)
+        tpr.append(tpr_)
+
+    AUC = 0
+
+    ax.plot(fpr, tpr, label=f"{AUC = }")
+
+    p = ax.scatter(
+        fpr,
+        tpr,
+        facecolors=list(thresholds),
+        edgecolors=["k"] * len(thresholds),
+        cmap="gnuplot",
+    )
+    plt.colorbar(p, ax=ax)
+    ax.legend()
+
+    ax.set_ylabel("TPR")
+    ax.set_xlabel("FPR")
+
+    return ax, fpr, tpr
 
 
 def assignWeights(data, mask=None, bins=50):
@@ -1408,7 +1457,7 @@ def test_training_pie(train_labels, test_labels):
     cmap = plt.get_cmap("tab20c")
     colors = cmap(np.array([1, 2, 5, 6]))
 
-    plt.figure(figsize=(12, 12))
+    plt.figure()
 
     wedges, texts, autotexts = plt.pie(
         x=[
