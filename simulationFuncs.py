@@ -1023,7 +1023,9 @@ def runRF(
 
     confusion_matrix_display(test_labels, predictions, vmin=vmin, vmax=vmax, ax=ax[0])
 
-    a = RocCurveDisplay.from_estimator(rf, test_features, test_labels, ax=ax[1])
+    # a = RocCurveDisplay.from_estimator(rf, test_features, test_labels, ax=ax[1])
+    prob_true = rf.predict_proba(test_features)[:, 1]
+    a, fpr, tpr = RocCurve_threshold(test_labels, prob_true, ax=ax[1])
 
     ax[1].plot([0, 1], [0, 1], "r-")
     ax[1].set_aspect(1)
@@ -1040,7 +1042,52 @@ def runRF(
 
         joblib.dump(rf, f"{save_fn}.joblib")
 
-    return rf, predictions, (a.fpr, a.tpr), importance
+    # return rf, predictions, (a.fpr, a.tpr), importance
+    return rf, predictions, (fpr, tpr), importance
+
+
+def RocCurve_threshold(test_labels, prob_true, ax=None):
+
+    from sklearn import metrics
+
+    if isinstance(ax, type(None)):
+        fig, ax = plt.subplots()
+    else:
+        pass
+
+    fpr = []
+    tpr = []
+
+    # thresholds = np.arange(0, 1.01, 0.01)
+    thresholds = np.linspace(0, 1, 2000)
+
+    for threshold in thresholds:
+        pred_labels = prob_true > threshold
+
+        TN = np.sum((test_labels == False) & (pred_labels == False))
+        FP = np.sum((test_labels == False) & (pred_labels == True))
+        FN = np.sum((test_labels == True) & (pred_labels == False))
+        TP = np.sum((test_labels == True) & (pred_labels == True))
+
+        fpr_ = FP / (FP + TN)
+        tpr_ = TP / (TP + FN)
+
+        fpr.append(fpr_)
+        tpr.append(tpr_)
+
+    AUC = metrics.roc_auc_score(test_labels, prob_true)
+
+    ax.plot(fpr, tpr, lw=0)
+    ax.set_title(f"{AUC = :.2f}")
+
+    p = ax.scatter(fpr, tpr, c=thresholds, cmap="gnuplot", s=5)
+    cbar = plt.colorbar(p, ax=ax)
+    cbar.ax.set_ylabel("Probability threshold")
+
+    ax.set_ylabel("TPR")
+    ax.set_xlabel("FPR")
+
+    return ax, fpr, tpr
 
 
 def assignWeights(data, mask=None, bins=50):
@@ -1221,9 +1268,9 @@ def generateSims(coords1, coords2, d1s, d2s, data, sib_i, sib_j, n_changes):
     else:
         pass
 
-    swm_mean = np.load("weighted_coh_diffs_mean.npy")
+    # swm_mean = np.load("weighted_coh_diffs_mean.npy")
 
-    out = np.empty((coords1.shape[0], 13), dtype=object)
+    out = np.empty((coords1.shape[0], 12), dtype=object)
     for n, (coord1, coord2, d1, d2, n_change) in enumerate(
         tqdm(zip(coords1, coords2, d1s, d2s, n_changes), total=coords1.shape[0])
     ):
@@ -1266,8 +1313,10 @@ def generateSims(coords1, coords2, d1s, d2s, data, sib_i, sib_j, n_changes):
         sib_j_ = np.zeros(ph_change.shape[1])[:, None, None]
 
         # if (coord1 == coord2).all():
-        swm = selection_window_metric(ph_change, sib_i_, sib_j_, 0, 1, progress=False)
-        swm = np.mean(swm) - swm_mean[coord1[0], coord1[1]]
+        # swm = selection_window_metric(ph_change, sib_i_, sib_j_, 0, 1, progress=False)
+        # swm = np.mean(swm) - swm_mean[coord1[0], coord1[1]]
+
+        # swm = 0
         # else:
         #     swm = selection_window_metric(
         #         ph_change, sib_i_, sib_j_, 0, 1, progress=False
@@ -1301,7 +1350,6 @@ def generateSims(coords1, coords2, d1s, d2s, data, sib_i, sib_j, n_changes):
                 amp_px,
                 poi_diff,
                 max_amp_diff,
-                swm,
                 actual_coherence,
                 apparent_coherence,
             ],
@@ -1407,7 +1455,7 @@ def test_training_pie(train_labels, test_labels):
     cmap = plt.get_cmap("tab20c")
     colors = cmap(np.array([1, 2, 5, 6]))
 
-    plt.figure(figsize=(12, 12))
+    plt.figure()
 
     wedges, texts, autotexts = plt.pie(
         x=[
@@ -1419,7 +1467,7 @@ def test_training_pie(train_labels, test_labels):
         labels=["True (training)", "False (training)", "True (test)", "False (test)"],
         colors=colors,
         autopct=lambda pct: func(pct, train_labels.shape[0]),
-        textprops=dict(fontsize=20),
+        textprops=dict(fontsize=16),
     )
 
 
@@ -1520,7 +1568,7 @@ def generateMetricsIFG(ifg1, ifg2, sib_i, sib_j):
 
     n_siblings = np.sum(mask, axis=0)
 
-    image_with_siblings = np.full((2, *sib_i.shape), fill_value=np.nan + 1j * np.nan)
+    image_with_siblings = np.empty((2, *sib_i.shape), dtype=np.complex64) * np.nan
 
     # print (ifg1[sib_i[mask].astype(int), sib_j[mask].astype(int)].shape)
 
@@ -1531,8 +1579,8 @@ def generateMetricsIFG(ifg1, ifg2, sib_i, sib_j):
         sib_i[mask].astype(int), sib_j[mask].astype(int)
     ]
 
-    # intAmp = abs(image_with_siblings[0])*abs(image_with_siblings[1])
-    intAmp = abs(image_with_siblings[0]) / abs(image_with_siblings[1])
+    intAmp = abs(image_with_siblings[0]) * abs(image_with_siblings[1])
+    # intAmp = abs(image_with_siblings[0]) / abs(image_with_siblings[1])
 
     # max_amp_diff = np.nanmax(intAmp[1:] - intAmp[0], axis=0).flatten() # NEW
     # print (image_with_siblings.shape)
@@ -1561,13 +1609,13 @@ def generateMetricsIFG(ifg1, ifg2, sib_i, sib_j):
     #                  np.nanmean(intAmp, axis=0).flatten(), np.nanstd(intAmp, axis=0).flatten(),
     #                  (abs(ifg1)*abs(ifg2)).flatten(), abs(coh).flatten(), abs(coh).flatten())).T
 
-    swm_mean = np.load("weighted_coh_diffs_mean.npy")
+    # swm_mean = np.load("weighted_coh_diffs_mean.npy")
 
-    swm = selection_window_metric(
-        np.stack((ifg1, ifg2)), sib_i, sib_j, 0, 1, progress=True
-    )
+    # swm = selection_window_metric(
+    #     np.stack((ifg1, ifg2)), sib_i, sib_j, 0, 1, progress=True
+    # )
 
-    swm = np.mean(swm, axis=0) - swm_mean
+    # swm = np.mean(swm, axis=0) - swm_mean
 
     print("Making output metrics")
     out = np.vstack(
@@ -1582,7 +1630,6 @@ def generateMetricsIFG(ifg1, ifg2, sib_i, sib_j):
             max_amp_diff,
             intAmp[0].flatten(),
             poi_diff.flatten(),
-            swm.flatten(),
             abs(coh).flatten(),
             abs(coh).flatten(),
         )
