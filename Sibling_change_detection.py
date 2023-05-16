@@ -50,9 +50,8 @@ def get_selection_metrics_ratio(filename, df_sims):
 
 # ixs_ = np.load("ixs.npy")
 # ixs = np.asarray([i for i in np.arange(81) if i not in ixs_])
-
-# for ix1, ix2 in zip(ixs, ixs + 1):
-for ix1, ix2 in zip(np.arange(90, 110), np.arange(91, 111)):
+# for ix1, ix2 in zip(np.arange(90, 110), np.arange(91, 111)):
+for ix1, ix2 in zip([100], [101]):
 
     if False:
         pass
@@ -60,7 +59,7 @@ for ix1, ix2 in zip(np.arange(90, 110), np.arange(91, 111)):
         print(ix1, ix2)
         ifg1 = ifgs[ix1]
         ifg2 = ifgs[ix2]
-
+        suffix = "_median"
         metrics = SF.generateMetricsIFG(ifg1, ifg2, SHP_i, SHP_j)
 
         # Dealing with inf or nan values in metrics
@@ -85,13 +84,11 @@ for ix1, ix2 in zip(np.arange(90, 110), np.arange(91, 111)):
             ),
         )
         df.to_csv(
-            f"/nfs/a1/homes/py15jmc/bootstrap/2023/Sibling_sel_window_metrics/IFG_{str(ix1).zfill(3)}_{str(ix2).zfill(3)}.csv"
+            f"/nfs/a1/homes/py15jmc/bootstrap/2023/Sibling_sel_window_metrics/IFG{suffix}_{str(ix1).zfill(3)}_{str(ix2).zfill(3)}.csv"
         )
 
-        continue
-
         df = get_selection_metrics_ratio(
-            "/nfs/a1/homes/py15jmc/bootstrap/2023/Sibling_sel_window_metrics/IFG_all.csv",
+            f"/nfs/a1/homes/py15jmc/bootstrap/2023/Sibling_sel_window_metrics/IFG_all{suffix}.csv",
             df,
         )  # Turn it into ratios
 
@@ -122,15 +119,14 @@ for ix1, ix2 in zip(np.arange(90, 110), np.arange(91, 111)):
                 dropped_mask[int(df["i"][ix]), int(df["j"][ix])] = False
             except:
                 print(f"Error : {ix}")
+        drop_ix = list(set(ix_nan + ix_sibs))
 
-        for ix in list(set(ix_nan + ix_sibs)):
-            print(f"Dropping {ix}")
+        print(f"Dropping {len(drop_ix)}")
+        for ix in drop_ix:
             df = df.drop(ix)
 
-        suffix = "_ratio"
-
         np.save(
-            f"actual/dropped_mask_{ix1}_{ix2}_{suffix}.npy",
+            f"actual/dropped_mask_{ix1}_{ix2}{suffix}.npy",
             dropped_mask,
         )
 
@@ -162,11 +158,11 @@ for ix1, ix2 in zip(np.arange(90, 110), np.arange(91, 111)):
 
         probs_arr[dropped_mask] = probs
         np.save(
-            f"actual/probabilities_{ix1}_{ix2}_{datetime.strftime(datetime.now(), '%Y%m%d_%H%M%S')}{suffix}.npy",
+            f"actual/probabilities_{ix1}_{ix2}{suffix}.npy",
             probs_arr,
         )
         np.save(
-            f"actual/predictions_{ix1}_{ix2}_{datetime.strftime(datetime.now(), '%Y%m%d_%H%M%S')}{suffix}.npy",
+            f"actual/predictions_{ix1}_{ix2}{suffix}.npy",
             predictions_arr,
         )
 

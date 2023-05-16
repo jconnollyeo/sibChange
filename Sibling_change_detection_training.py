@@ -138,9 +138,10 @@ def main():
     ratio_True = 0.5
     ratio_train = 0.75
 
-    suffix, r = "_ratio", True
+    suffix, r = "_median", True
 
     if Path(f"df{suffix}.csv").exists():
+        print("exists")
         df = pd.read_csv(f"df{suffix}.csv")
     else:
         try:
@@ -336,7 +337,7 @@ def main():
         df = pd.concat((df_sims, df_sims_unchanged), ignore_index=True)
 
         df = get_selection_metrics_ratio(
-            "/nfs/a1/homes/py15jmc/bootstrap/2023/Sibling_sel_window_metrics/IFG_all.csv",
+            f"/nfs/a1/homes/py15jmc/bootstrap/2023/Sibling_sel_window_metrics/IFG_all{suffix}.csv",
             df,
         )
 
@@ -346,6 +347,12 @@ def main():
 
         print("Headers")
         print(list(df))
+        # df.to_csv(f"df{suffix}.csv", index=False, header=True)
+        if np.isinf(df.to_numpy().astype(float)).any():
+            print("is inf")
+            to_remove = np.where(np.isinf(df.to_numpy().astype(float)))[0]
+            df.drop(to_remove, axis="index", inplace=True)
+            df.reset_index(drop=True, inplace=True)
 
         df.to_csv(f"df{suffix}.csv", index=False, header=True)
 
@@ -403,7 +410,7 @@ def main():
 
 
 def get_selection_metrics_ratio(filename, df_sims):
-    df_metrics = pd.read_csv(filename)
+    df_metrics = pd.read_csv(filename, index_col=0)
 
     # Get the indices of the coords used in training.
     i = df_sims["i"].astype(int)

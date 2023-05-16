@@ -1048,6 +1048,8 @@ def runRF(
 
 def RocCurve_threshold(test_labels, prob_true, ax=None):
 
+    from sklearn import metrics
+
     if isinstance(ax, type(None)):
         fig, ax = plt.subplots()
     else:
@@ -1056,7 +1058,8 @@ def RocCurve_threshold(test_labels, prob_true, ax=None):
     fpr = []
     tpr = []
 
-    thresholds = np.arange(0, 1.01, 0.01)
+    # thresholds = np.arange(0, 1.01, 0.01)
+    thresholds = np.linspace(0, 1, 2000)
 
     for threshold in thresholds:
         pred_labels = prob_true > threshold
@@ -1072,19 +1075,14 @@ def RocCurve_threshold(test_labels, prob_true, ax=None):
         fpr.append(fpr_)
         tpr.append(tpr_)
 
-    AUC = 0
+    AUC = metrics.roc_auc_score(test_labels, prob_true)
 
-    ax.plot(fpr, tpr, label=f"{AUC = }")
+    ax.plot(fpr, tpr, lw=0)
+    ax.set_title(f"{AUC = :.2f}")
 
-    p = ax.scatter(
-        fpr,
-        tpr,
-        facecolors=list(thresholds),
-        edgecolors=["k"] * len(thresholds),
-        cmap="gnuplot",
-    )
-    plt.colorbar(p, ax=ax)
-    ax.legend()
+    p = ax.scatter(fpr, tpr, c=thresholds, cmap="gnuplot", s=5)
+    cbar = plt.colorbar(p, ax=ax)
+    cbar.ax.set_ylabel("Probability threshold")
 
     ax.set_ylabel("TPR")
     ax.set_xlabel("FPR")
@@ -1469,7 +1467,7 @@ def test_training_pie(train_labels, test_labels):
         labels=["True (training)", "False (training)", "True (test)", "False (test)"],
         colors=colors,
         autopct=lambda pct: func(pct, train_labels.shape[0]),
-        textprops=dict(fontsize=20),
+        textprops=dict(fontsize=16),
     )
 
 
