@@ -51,7 +51,7 @@ def get_selection_metrics_ratio(filename, df_sims):
 # ixs_ = np.load("ixs.npy")
 # ixs = np.asarray([i for i in np.arange(81) if i not in ixs_])
 # for ix1, ix2 in zip(np.arange(90, 110), np.arange(91, 111)):
-for ix1, ix2 in zip([100], [101]):
+for ix1, ix2 in zip([112], [113]):
 
     if False:
         pass
@@ -92,6 +92,15 @@ for ix1, ix2 in zip([100], [101]):
             df,
         )  # Turn it into ratios
 
+        # df_ratioed = get_selection_metrics_ratio(
+        #     f"/nfs/a1/homes/py15jmc/bootstrap/2023/Sibling_sel_window_metrics/IFG_all_median.csv",
+        #     df,
+        # )
+
+        # df_ratioed.rename(columns=lambda x: x + "_ratio", inplace=True)
+
+        # df = pd.concat([df, df_ratioed], axis=1)
+
         dropped_mask = np.ones(ifg1.shape, dtype=bool)
 
         # Remove any nan values
@@ -122,8 +131,9 @@ for ix1, ix2 in zip([100], [101]):
         drop_ix = list(set(ix_nan + ix_sibs))
 
         print(f"Dropping {len(drop_ix)}")
-        for ix in drop_ix:
-            df = df.drop(ix)
+        # for ix in drop_ix:
+        # df = df.drop(ix)
+        df.drop(drop_ix, axis="index", inplace=True)
 
         np.save(
             f"actual/dropped_mask_{ix1}_{ix2}{suffix}.npy",
@@ -133,7 +143,7 @@ for ix1, ix2 in zip([100], [101]):
         df.to_csv(f"actual/IFG_{ix1}_{ix2}_dropped{suffix}.csv")
         # RF = joblib.load("RF_20230215_121116.jbl")
 
-        RF = joblib.load("RF_ratio.jbl")
+        RF = joblib.load(f"RF{suffix}.jbl")
 
         features = df[
             [

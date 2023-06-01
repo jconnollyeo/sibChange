@@ -138,7 +138,7 @@ def main():
     ratio_True = 0.5
     ratio_train = 0.75
 
-    suffix, r = "_median", True
+    suffix, r = "_median_absratio", True
 
     if Path(f"df{suffix}.csv").exists():
         print("exists")
@@ -336,59 +336,74 @@ def main():
 
         df = pd.concat((df_sims, df_sims_unchanged), ignore_index=True)
 
-        df = get_selection_metrics_ratio(
-            f"/nfs/a1/homes/py15jmc/bootstrap/2023/Sibling_sel_window_metrics/IFG_all{suffix}.csv",
+        df_ratioed = get_selection_metrics_ratio_training(
+            f"/nfs/a1/homes/py15jmc/bootstrap/2023/Sibling_sel_window_metrics/IFG_all_median.csv",
             df,
         )
 
-        labels = np.ones(df.shape[0], dtype=bool)
+        df_ratioed.rename(columns=lambda x: x + "_ratio", inplace=True)
+
+        # df = pd.concat([df, df_ratioed], axis=1)
+
+        labels = np.ones(df_ratioed.shape[0], dtype=bool)
         labels[-sims_unchanged.shape[0] :] = False
-        df["labels"] = labels
+        df_ratioed["labels"] = labels
 
         print("Headers")
-        print(list(df))
-        # df.to_csv(f"df{suffix}.csv", index=False, header=True)
-        if np.isinf(df.to_numpy().astype(float)).any():
+        print(list(df_ratioed))
+        # df_ratioed.to_csv(f"df{suffix}.csv", index=False, header=True)
+        if np.isinf(df_ratioed.to_numpy().astype(float)).any():
             print("is inf")
-            to_remove = np.where(np.isinf(df.to_numpy().astype(float)))[0]
-            df.drop(to_remove, axis="index", inplace=True)
-            df.reset_index(drop=True, inplace=True)
+            to_remove = np.where(np.isinf(df_ratioed.to_numpy().astype(float)))[0]
+            df_ratioed.drop(to_remove, axis="index", inplace=True)
+            df_ratioed.reset_index(drop=True, inplace=True)
 
-        df.to_csv(f"df{suffix}.csv", index=False, header=True)
+        df_ratioed.to_csv(f"df{suffix}.csv", index=False, header=True)
 
     plt.figure()
 
-    i_plot, j_plot = np.mgrid[0 : np.max(df["i"]), 0 : np.max(df["j"])]
+    i_plot, j_plot = np.mgrid[0 : np.max(df_ratioed["i"]), 0 : np.max(df_ratioed["j"])]
 
     split_mask_ = f(j_plot, i_plot) > 0
 
     plt.pcolormesh(split_mask_, cmap="binary", alpha=0.4)
-    plt.scatter(df["j"], df["i"], c=df["labels"], s=2, cmap="bwr")
+    plt.scatter(df_ratioed["j"], df_ratioed["i"], c=df_ratioed["labels"], s=2, cmap="bwr")
 
     # Doing the random forest
-    labels = np.array(df["labels"])
-    print(labels)
+    labels = np.array(df_ratioed["labels"])
 
-    print(list(df))
+    print(list(df_ratioed))
 
-    # features = df[["n_siblings", "jk_std", "jk_bias", "amp_mean", "amp_px", "max_amp_diff", "apparent_coherence"]
-    features = df[
+    # features = df_ratioed[["n_siblings", "jk_std", "jk_bias", "amp_mean", "amp_px", "max_amp_diff", "apparent_coherence"]
+    # features = df_ratioed[
+    #     [
+    #         "n_siblings",
+    #         "jk_std",
+    #         "jk_bias",
+    #         "amp_mean",
+    #         "max_amp_diff",
+    #         "poi_diff",
+    #         "apparent_coherence",
+    #     ]
+    # ]
+
+    features = df_ratioed[
         [
             "n_siblings",
-            "jk_std",
-            "jk_bias",
-            "amp_mean",
-            "max_amp_diff",
-            "poi_diff",
-            "apparent_coherence",
+            "jk_std_ratio",
+            "jk_bias_ratio",
+            "amp_mean_ratio",
+            "max_amp_diff_ratio",
+            "poi_diff_ratio",
+            "apparent_coherence_ratio",
         ]
     ]
 
-    # print(np.where(np.isnan(df)))
-    print(df)
+    # print(np.where(np.isnan(df_ratioed)))
+    print(df_ratioed)
     feature_list = np.array(list(features.columns))
 
-    split_mask = f(df.j, df.i) <= 0
+    split_mask = f(df_ratioed.j, df_ratioed.i) <= 0
 
     train_features = features[~split_mask]
     test_features = features[split_mask]
@@ -409,43 +424,36 @@ def main():
     plt.show()
 
 
-def get_selection_metrics_ratio(filename, df_sims):
-    df_metrics = pd.read_csv(filename, index_col=0)
-
+def get_selection_metrics_ratio_training(filename, df_sims):
+    df_metrics = pd.read_csv(filename)
     # Get the indices of the coords used in training.
     i = df_sims["i"].astype(int)
     j = df_sims["j"].astype(int)
-
     indices = []
-
     # Loop through the training indeces and find the corresponding mean metrics
     # for the estimation period.
+    print(list(df_metrics))
     for i_, j_ in zip(i, j):
         ix = np.where((df_metrics["i"] == i_) & (df_metrics["j"] == j_))[0][0]
         indices.append(ix)
 
     # Based on the dataframe position indices in the estimation period metrics,
-    # retrieve those values and put into the metrics df sims dataframe.
-    # df_metrics_sims = df_metrics.loc[df_sims.index[indices]]
+    # retrieve those values and put into the metrics df_ratioed sims dataframe.
     df_metrics_sims = df_metrics.loc[indices]
 
     # Get the ratio between the df_sims (values for this particular image) and
     # the metrics in the estimation period.
-
-    # df_metrics_sims[df_metrics_sims == 0] = np.nan
-
-    # df_sims[df_sims == 0] = np.nan
 
     out = df_sims.copy()
 
     out.reset_index(drop=True, inplace=True)
     df_metrics_sims.reset_index(drop=True, inplace=True)
 
-    # print(f"{out = }")
-    # print(f"{df_metrics_sims = }")
-
-    out[list(out)[3:]] = out[list(out)[3:]] / df_metrics_sims[list(df_metrics_sims)[3:]]
-    # out = df_sims / df_metrics_sims
+    # out[list(out)[3:]] = out[list(out)[3:]] / df_metrics_sims[list(df_metrics_sims)[3:]]
+    out[list(out)[3:]] = (
+        abs(out[list(out)[3:]] - df_metrics_sims[list(df_metrics_sims)[3:]])
+        / df_metrics_sims[list(df_metrics_sims)[3:]]
+    )
 
     return out
 

@@ -1159,6 +1159,8 @@ def manipulateSiblings(
     _, _, sib_i_, sib_j_, ph_1 = flatWrapper(data, coord1, sib_i, sib_j)
     _, _, _, _, ph_2 = flatWrapper(data, coord2, sib_i, sib_j)
 
+    
+
     # Transform the phase centre
     ph_2 = transformPhaseCentre(ph_1, ph_2)
 
@@ -1949,10 +1951,8 @@ def multilook_nan(im, fa, fr):
         imout[k, :, :] = aa[:, k::fr]
     return np.nanmean(imout, axis=0)
 
-
 def main():
     return None
-
 
 if __name__ == "__main__":
     sys.exit(main())
